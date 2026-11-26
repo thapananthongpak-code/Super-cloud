@@ -1,0 +1,27 @@
+# Gotenberg on Fly.io (Phase 4, optional). Deploy from this folder:
+#   fly launch --no-deploy --copy-config --name YOUR-gotenberg
+#   fly secrets set GOTENBERG_API_BASIC_AUTH_USERNAME=... GOTENBERG_API_BASIC_AUTH_PASSWORD=...
+#   fly deploy
+# Then set GOTENBERG_URL=https://YOUR-gotenberg.fly.dev plus GOTENBERG_USERNAME/PASSWORD in Vercel.
+
+app = "YOUR-gotenberg"
+primary_region = "sin"
+
+[build]
+  image = "gotenberg/gotenberg:8"
+
+[experimental]
+  cmd = ["gotenberg", "--api-enable-basic-auth", "--api-timeout=120s"]
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  # Sleep when idle so it costs (almost) nothing; first conversion after idle takes a few seconds longer.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1

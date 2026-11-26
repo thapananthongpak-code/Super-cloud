@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-anuphan), ui-sans-serif, system-ui, sans-serif;
+}
+
+@theme {
+  --color-cream: #fff8f0;
+  --color-cream-dark: #fbead7;
+  --color-ink: #3b2a1e;
+  --color-ink-soft: #7a6352;
+  --color-brand: #e8692b;
+  --color-brand-dark: #c9531b;
+  --color-brand-soft: #fde4d3;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-cream);
+  color: var(--color-ink);
+}
+
+/* Bigger, friendlier focus ring for keyboard users. */
+:focus-visible {
+  outline: 3px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+@keyframes highlight {
+  0%, 60% { box-shadow: 0 0 0 4px var(--color-brand); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.highlight {
+  animation: highlight 3s ease-out;
+}

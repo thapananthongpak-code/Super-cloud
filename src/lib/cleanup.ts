@@ -1,10 +1,10 @@
 import "server-only";
-import { deleteObjects } from "./r2";
+import { deleteObjects } from "./storage";
 import { db } from "./supabase";
 
 type BundleWithKeys = { id: string; files: { r2_key: string; pdf_r2_key: string | null }[] };
 
-/** Deletes bundles and every R2 object they own (originals + converted PDFs). Storage first, then rows. */
+/** Deletes bundles and every stored object they own (originals + converted PDFs). Storage first, then rows. */
 export async function deleteBundles(bundleIds: string[]): Promise<number> {
   if (bundleIds.length === 0) return 0;
   const { data, error } = await db().from("bundles").select("id, files(r2_key, pdf_r2_key)").in("id", bundleIds);

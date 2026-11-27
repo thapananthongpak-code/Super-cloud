@@ -2,19 +2,34 @@
 
 เว็บฝากไฟล์ให้เพื่อนและครอบครัว ฝากจากมือถือ โหลดจากคอมได้ ไฟล์หมดอายุเองใน 7/30/60 วัน
 
-Next.js 16 (App Router) · Cloudflare R2 · Supabase · Upstash Redis · Vercel · Gotenberg (ไม่บังคับ)
+Next.js 16 (App Router) · Backblaze B2 (หรือ Cloudflare R2) · Supabase · Upstash Redis · Vercel · Gotenberg (ไม่บังคับ)
 
 ## ตั้งค่าครั้งแรก (Phase 0)
 
-### 1. Cloudflare R2
+### 1. Backblaze B2 (ที่เก็บไฟล์ ฟรี 10 GB ไม่ต้องผูกบัตร)
 
-1. สร้าง bucket แบบ **private** (ไม่เปิด public access / ไม่ผูก custom domain)
-2. R2 → Manage API tokens → สร้าง token สิทธิ์ **Object Read & Write** เลือก **เฉพาะ bucket นี้**
-   จด `Access Key ID`, `Secret Access Key` และ `Account ID`
-3. Bucket → Settings → **CORS policy** วางเนื้อหาจาก [`r2-cors.json`](r2-cors.json)
-   แล้วแก้ `https://YOUR-APP.vercel.app` เป็นโดเมนจริง (ใส่ได้หลายโดเมน)
-4. แนะนำ: Bucket → Settings → **Object lifecycle rules** → ลบ object ที่อายุเกิน **61 วัน**
-   เป็นตาข่ายกันพลาด เผื่อมีไฟล์ที่อัปโหลดแล้วไม่ได้กดยืนยัน หรือ cron ล้มเหลว
+1. สมัครที่ https://www.backblaze.com/sign-up/cloud-storage
+2. **Buckets → Create a Bucket**: ตั้งชื่อ (ต้องไม่ซ้ำกับใครในโลก เช่น `supercloud-ชื่อเล่น-2026`),
+   Files in Bucket = **Private**, Default Encryption ตามสะดวก, Object Lock = Disable
+   จด **Endpoint** ที่หน้า bucket (เช่น `s3.us-west-004.backblazeb2.com`)
+3. **Application Keys → Add a New Application Key**: Allow access to Bucket(s) = **เลือก bucket นี้**,
+   Type of Access = **Read and Write** แล้วจด `keyID` และ `applicationKey` (แสดงครั้งเดียว)
+   - `keyID` → `STORAGE_ACCESS_KEY_ID`
+   - `applicationKey` → `STORAGE_SECRET_ACCESS_KEY`
+   - `https://` + Endpoint → `STORAGE_ENDPOINT`
+   - ชื่อ bucket → `STORAGE_BUCKET`
+4. ตั้ง CORS และกฎลบไฟล์อัตโนมัติด้วยคำสั่งเดียว (ใช้ **Master Application Key** จากหน้า Application Keys
+   → Generate New Master Application Key ใช้เฉพาะคำสั่งนี้ ห้ามใส่ใน Vercel)
+
+   ```bash
+   B2_KEY_ID=master-key-id B2_APP_KEY=master-app-key \
+     node scripts/setup-b2.mjs ชื่อ-bucket https://YOUR-APP.vercel.app http://localhost:3000
+   ```
+
+   ได้โดเมนใหม่เมื่อไหร่ ให้รันคำสั่งนี้ซ้ำพร้อมใส่ทุกโดเมน (คำสั่งจะเขียนทับของเดิม)
+
+> ใช้ Cloudflare R2 แทนก็ได้ ใส่ `STORAGE_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com`
+> แล้วตั้ง CORS ใน R2 ให้รับ PUT/GET และ header `Content-Type`, `Content-Disposition`
 
 ### 2. Supabase
 
@@ -34,7 +49,7 @@ Next.js 16 (App Router) · Cloudflare R2 · Supabase · Upstash Redis · Vercel 
    - `ADMIN_PIN` ใช้ตัวเลขยาว 8 หลักขึ้นไป
    - `CRON_SECRET` สร้างด้วย `openssl rand -hex 32`
 3. Cron ตั้งไว้แล้วใน [`vercel.json`](vercel.json) เรียก `/api/cron/cleanup` ทุกวันเวลา 03:00 น. (เวลาไทย)
-4. ตั้ง budget alert ทั้งใน Vercel และ Cloudflare
+4. ตั้ง budget alert ใน Vercel และ caps & alerts ใน Backblaze (Account → Caps & Alerts)
 
 ### รันบนเครื่อง
 
@@ -44,20 +59,20 @@ npm install                  # postinstall จะคัดลอก pdf.js worke
 npm run dev
 ```
 
-ถ้าทดสอบอัปโหลดจาก localhost ต้องมี `http://localhost:3000` ใน CORS ของ R2
+ถ้าทดสอบอัปโหลดจาก localhost ต้องมี `http://localhost:3000` ตอนรัน `setup-b2.mjs`
 
 ## การทำงานโดยสรุป
 
 | Route | หน้าที่ |
 | --- | --- |
 | `POST /api/upload/init` | ตรวจจำนวน ขนาด นามสกุล mime และ rate limit แล้วออก presigned PUT URL พร้อมจำ key ที่ออกให้ไว้ใน Redis |
-| `POST /api/upload/complete` | รับเฉพาะ key ที่ init ออกให้ (ใช้ได้ครั้งเดียว) ตรวจว่าไฟล์อยู่ใน R2 จริง ขนาดไม่เกิน และไม่ใช่ไฟล์โปรแกรม (MZ/ELF) แล้วคำนวณ `expires_at` จาก 7/30/60 ฝั่งเซิร์ฟเวอร์ |
-| `GET /api/bundles` | เฉพาะรายการที่ยังไม่หมดอายุ ไม่ส่ง r2 key หรือ hash รหัสผ่านออกไป |
+| `POST /api/upload/complete` | รับเฉพาะ key ที่ init ออกให้ (ใช้ได้ครั้งเดียว) ตรวจว่าไฟล์อยู่ในที่เก็บไฟล์จริง ขนาดไม่เกิน และไม่ใช่ไฟล์โปรแกรม (MZ/ELF) แล้วคำนวณ `expires_at` จาก 7/30/60 ฝั่งเซิร์ฟเวอร์ |
+| `GET /api/bundles` | เฉพาะรายการที่ยังไม่หมดอายุ ไม่ส่ง key ของไฟล์ หรือ hash รหัสผ่านออกไป |
 | `POST /api/files/[id]/download` | ตรวจวันหมดอายุและรหัสผ่าน (จำกัด 5 ครั้งผิด / 15 นาที / IP) แล้วออก signed GET URL อายุ 5 นาที ใส่ชื่อไฟล์จริงผ่าน `Content-Disposition` |
-| `POST /api/admin/delete` | ตรวจ `ADMIN_PIN` (จำกัด 5 ครั้งผิด / 15 นาที / IP) แล้วลบทั้งชุดหรือรายไฟล์ ทั้งใน R2 และฐานข้อมูล |
-| `GET /api/cron/cleanup` | ตรวจ `Authorization: Bearer CRON_SECRET` แล้วลบชุดที่หมดอายุทั้งใน R2 และฐานข้อมูล |
+| `POST /api/admin/delete` | ตรวจ `ADMIN_PIN` (จำกัด 5 ครั้งผิด / 15 นาที / IP) แล้วลบทั้งชุดหรือรายไฟล์ ทั้งในที่เก็บไฟล์และฐานข้อมูล |
+| `GET /api/cron/cleanup` | ตรวจ `Authorization: Bearer CRON_SECRET` แล้วลบชุดที่หมดอายุทั้งในที่เก็บไฟล์และฐานข้อมูล |
 
-- ชื่อ object ใน R2 สุ่มเป็น `u/<uuid>` (ต้นฉบับ) และ `p/<uuid>` (PDF ที่แปลงแล้ว) ไม่ใช้ชื่อไฟล์จริง
+- ชื่อไฟล์ในที่เก็บสุ่มเป็น `u/<uuid>` (ต้นฉบับ) และ `p/<uuid>` (PDF ที่แปลงแล้ว) ไม่ใช้ชื่อไฟล์จริง
 - รหัสผ่านตั้งต่อ **ชุดไฟล์** (หนึ่งครั้งที่ฝาก) ใช้กับทุกไฟล์ในชุด เก็บเป็น bcrypt hash
 - ค่าจำกัดต่าง ๆ อยู่ใน [`src/lib/constants.ts`](src/lib/constants.ts) (100 MB/ไฟล์, 10 ไฟล์/ครั้ง, 300 MB/ครั้ง)
   และ [`src/lib/ratelimit.ts`](src/lib/ratelimit.ts)

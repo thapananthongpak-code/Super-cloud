@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getExtension, PASSWORD_MAX } from "@/lib/constants";
 import { handle, json, jsonError, MSG, readJson } from "@/lib/http";
 import { verifyPassword } from "@/lib/password";
-import { presignGet } from "@/lib/r2";
+import { presignGet } from "@/lib/storage";
 import { clientIp, isRateLimited, rateLimit } from "@/lib/ratelimit";
 import { db } from "@/lib/supabase";
 

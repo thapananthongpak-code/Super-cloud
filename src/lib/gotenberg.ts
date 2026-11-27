@@ -1,6 +1,6 @@
 import "server-only";
 import { getExtension } from "./constants";
-import { getObjectBytes, newObjectKey, putObjectBytes } from "./r2";
+import { contentDisposition, getObjectBytes, newObjectKey, putObjectBytes } from "./storage";
 import { db } from "./supabase";
 
 export const OFFICE_EXTENSIONS = ["doc", "docx", "odt", "rtf", "ppt", "pptx", "odp", "xls", "xlsx", "ods", "csv"];
@@ -14,7 +14,7 @@ export function gotenbergEnabled(): boolean {
 }
 
 /**
- * Converts an Office file already stored in R2 into PDF via Gotenberg and
+ * Converts an Office file already in storage into PDF via Gotenberg and
  * saves it next to the original. Failures are logged and swallowed: the
  * original file is still downloadable, the "PDF" option just won't appear.
  */
@@ -43,7 +43,8 @@ export async function convertToPdf(file: { id: string; name: string; r2_key: str
 
     const pdf = new Uint8Array(await res.arrayBuffer());
     const pdfKey = newObjectKey("p");
-    await putObjectBytes(pdfKey, pdf, "application/pdf");
+    const pdfName = file.name.replace(/\.[^.]+$/, "") + ".pdf";
+    await putObjectBytes(pdfKey, pdf, "application/pdf", contentDisposition("attachment", pdfName));
     const { error } = await db().from("files").update({ pdf_r2_key: pdfKey }).eq("id", file.id);
     if (error) throw error;
   } catch (err) {

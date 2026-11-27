@@ -15,7 +15,7 @@ import { convertToPdf, gotenbergEnabled, isOfficeFile } from "@/lib/gotenberg";
 import { handle, json, jsonError, MSG, readJson } from "@/lib/http";
 import { hashPassword } from "@/lib/password";
 import { pendingKey, type PendingUpload } from "@/lib/pending";
-import { deleteObjects, headObject, readHead } from "@/lib/r2";
+import { deleteObjects, headObject, readHead } from "@/lib/storage";
 import { clientIp, rateLimit, redis } from "@/lib/ratelimit";
 import { db, type FileRow } from "@/lib/supabase";
 

@@ -38,11 +38,12 @@ export async function fetcher<T>(url: string): Promise<T> {
   return data as T;
 }
 
-/** PUT a file straight to R2 with a presigned URL, reporting progress. */
+/** PUT a file straight to object storage with a presigned URL, reporting progress. */
 export function putWithProgress(
   url: string,
   file: Blob,
   contentType: string,
+  disposition: string,
   onProgress: (loaded: number) => void,
   signal?: AbortSignal,
 ): Promise<void> {
@@ -50,6 +51,7 @@ export function putWithProgress(
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", url);
     xhr.setRequestHeader("Content-Type", contentType);
+    xhr.setRequestHeader("Content-Disposition", disposition);
     xhr.upload.onprogress = (e) => onProgress(e.loaded);
     xhr.onload = () =>
       xhr.status >= 200 && xhr.status < 300

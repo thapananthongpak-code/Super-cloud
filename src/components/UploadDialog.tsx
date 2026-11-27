@@ -24,7 +24,7 @@ import { FileIcon } from "./FileIcon";
 
 type Step = "form" | "review" | "uploading" | "done";
 
-type InitResponse = { uploadId: string; uploads: { url: string; contentType: string }[] };
+type InitResponse = { uploadId: string; uploads: { url: string; contentType: string; contentDisposition: string }[] };
 type CompleteResponse = { bundleId: string; expiresAt: string };
 
 const NAME_KEY = "uploader-name";
@@ -131,6 +131,7 @@ export function UploadDialog({
           target.url,
           files[i]!,
           target.contentType,
+          target.contentDisposition,
           (n) => {
             loaded[i] = n;
             report();

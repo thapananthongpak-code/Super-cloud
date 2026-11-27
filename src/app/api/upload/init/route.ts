@@ -6,7 +6,7 @@ import {
   formatBytes,
 } from "@/lib/constants";
 import { handle, json, jsonError, MSG, readJson } from "@/lib/http";
-import { newObjectKey, presignPut, PUT_URL_TTL } from "@/lib/r2";
+import { contentDisposition, newObjectKey, presignPut, PUT_URL_TTL } from "@/lib/storage";
 import { pendingKey, type PendingUpload } from "@/lib/pending";
 import { clientIp, rateLimit, redis } from "@/lib/ratelimit";
 
@@ -58,7 +58,11 @@ export const POST = handle(async (req: Request) => {
   };
 
   const uploads = await Promise.all(
-    pending.files.map(async (f) => ({ url: await presignPut(f.key, f.mime), contentType: f.mime })),
+    pending.files.map(async (f) => {
+      // Stored on the object so downloads keep the real (Thai) file name on every storage provider.
+      const disposition = contentDisposition("attachment", f.name);
+      return { url: await presignPut(f.key, f.mime, disposition), contentType: f.mime, contentDisposition: disposition };
+    }),
   );
 
   // Remember exactly which keys we handed out. /complete only accepts these,
